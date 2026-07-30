@@ -26,6 +26,26 @@ import g6 from "@/assets/g6.jpg";
 import g7 from "@/assets/g7.jpg";
 import g8 from "@/assets/g8.jpg";
 
+// --- Photos managed from the ledger app (falls back to the bundled images) ---
+type ManifestImage = { url: string; tag: string | null; alt: string | null };
+type SiteManifest = { hero: ManifestImage | null; about: ManifestImage | null; gallery: ManifestImage[] };
+
+async function loadManifest(): Promise<SiteManifest | null> {
+  const raw = typeof process !== "undefined" ? process.env.LEDGER_PUBLIC_URL : undefined;
+  const base = raw?.replace(/\/$/, "");
+  if (!base) return null;
+  try {
+    const res = await fetch(`${base}/api/site/manifest`, { signal: AbortSignal.timeout(4000) });
+    if (!res.ok) return null;
+    const m = (await res.json()) as SiteManifest;
+    const abs = (i: ManifestImage | null) =>
+      i ? { ...i, url: i.url.startsWith("http") ? i.url : `${base}${i.url}` } : null;
+    return { hero: abs(m.hero), about: abs(m.about), gallery: (m.gallery ?? []).map((g) => abs(g)!) };
+  } catch {
+    return null;
+  }
+}
+
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
@@ -62,6 +82,7 @@ export const Route = createFileRoute("/")({
       },
     ],
   }),
+  loader: () => loadManifest(),
   component: Home,
 });
 
@@ -123,9 +144,25 @@ function Home() {
     return () => clearInterval(id);
   }, []);
 
+  const manifest = Route.useLoaderData();
+  const heroSrc = manifest?.hero?.url ?? hero;
+  const aboutSrc = manifest?.about?.url ?? about;
+
+  const galleryItems = useMemo<{ src: string; tag: string; alt: string }[]>(() => {
+    if (manifest?.gallery?.length) {
+      return manifest.gallery.map((g) => ({ src: g.url, tag: g.tag ?? "All", alt: g.alt ?? "" }));
+    }
+    return GALLERY;
+  }, [manifest]);
+
+  const igStrip = useMemo(
+    () => (manifest?.gallery?.length ? manifest.gallery.map((g) => g.url) : [g2, g6, g7, g3, g4, g1, g8, g5]),
+    [manifest],
+  );
+
   const gallery = useMemo(
-    () => (filter === "All" ? GALLERY : GALLERY.filter((g) => g.tag === filter)),
-    [filter],
+    () => (filter === "All" ? galleryItems : galleryItems.filter((g) => g.tag === filter)),
+    [filter, galleryItems],
   );
 
   return (
@@ -199,8 +236,8 @@ function Home() {
       {/* HERO */}
       <section id="top" className="relative min-h-[100svh] w-full overflow-hidden">
         <img
-          src={hero}
-          alt="Elegant hand with luxury dark nails"
+          src={heroSrc}
+          alt={manifest?.hero?.alt ?? "Elegant hand with luxury dark nails"}
           width={1600}
           height={1800}
           className="absolute inset-0 h-full w-full object-cover object-center animate-fade-in"
@@ -317,8 +354,8 @@ function Home() {
           <div className="relative">
             <div className="relative overflow-hidden rounded-2xl border border-border">
               <img
-                src={about}
-                alt="Portrait of the NXM Nails founder in the studio"
+                src={aboutSrc}
+                alt={manifest?.about?.alt ?? "Portrait of the NXM Nails founder in the studio"}
                 width={1200}
                 height={1500}
                 loading="lazy"
@@ -498,7 +535,7 @@ function Home() {
           </div>
 
           <div className="mt-10 grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-5">
-            {[g2, g6, g7, g3, g4, g1, g8, g5].map((src, i) => (
+            {igStrip.map((src, i) => (
               <a
                 key={i}
                 href="https://instagram.com"
