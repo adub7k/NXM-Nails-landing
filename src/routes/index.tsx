@@ -32,10 +32,18 @@ import g8 from "@/assets/g8.jpg";
 type ManifestImage = { url: string; tag: string | null; alt: string | null };
 type SiteManifest = { hero: ManifestImage | null; about: ManifestImage | null; gallery: ManifestImage[] };
 type SiteReview = { author: string; rating: number; text: string; role: string | null };
+type SiteService = {
+  name: string;
+  priceCents: number;
+  durationMin: number;
+  category: string | null;
+  priceNote: string | null;
+};
 
 async function loadSiteData(): Promise<{
   manifest: SiteManifest | null;
   reviews: SiteReview[] | null;
+  services: SiteService[] | null;
   ledgerBase: string;
 }> {
   const raw = typeof process !== "undefined" ? process.env.LEDGER_PUBLIC_URL : undefined;
@@ -46,12 +54,13 @@ async function loadSiteData(): Promise<{
   const base = /^http:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0)/.test(trimmed)
     ? trimmed
     : trimmed.replace(/^http:\/\//, "https://");
-  if (!base) return { manifest: null, reviews: null, ledgerBase: "" };
+  if (!base) return { manifest: null, reviews: null, services: null, ledgerBase: "" };
   const abs = (i: ManifestImage | null) =>
     i ? { ...i, url: i.url.startsWith("http") ? i.url : `${base}${i.url}` } : null;
 
   let manifest: SiteManifest | null = null;
   let reviews: SiteReview[] | null = null;
+  let services: SiteService[] | null = null;
   try {
     const res = await fetch(`${base}/api/site/manifest`, { signal: AbortSignal.timeout(8000) });
     if (res.ok) {
@@ -67,7 +76,13 @@ async function loadSiteData(): Promise<{
   } catch {
     /* fall back to sample testimonials */
   }
-  return { manifest, reviews, ledgerBase: base };
+  try {
+    const res = await fetch(`${base}/api/book/services`, { signal: AbortSignal.timeout(8000) });
+    if (res.ok) services = (await res.json()) as SiteService[];
+  } catch {
+    /* fall back to bundled menu */
+  }
+  return { manifest, reviews, services, ledgerBase: base };
 }
 
 export const Route = createFileRoute("/")({
@@ -101,7 +116,7 @@ export const Route = createFileRoute("/")({
           telephone: "+1-555-000-0000",
           address: { "@type": "PostalAddress", addressLocality: "New York", addressRegion: "NY", addressCountry: "US" },
           openingHours: ["Tu-Fr 10:00-19:00", "Sa 10:00-18:00"],
-          sameAs: ["https://instagram.com/nxmnails"],
+          sameAs: ["https://www.instagram.com/nxm_.nails/"],
         }),
       },
     ],
@@ -167,6 +182,7 @@ function Home() {
   const ledgerBase = loaderData.ledgerBase;
   const [manifest, setManifest] = useState<SiteManifest | null>(loaderData.manifest);
   const [reviews, setReviews] = useState<SiteReview[] | null>(loaderData.reviews);
+  const [services, setServices] = useState<SiteService[] | null>(loaderData.services);
   const [bookingOpen, setBookingOpen] = useState(false);
 
   // Self-heal: re-fetch photos + reviews on the client so her latest content
@@ -187,7 +203,27 @@ function Home() {
         if (rv) setReviews(rv);
       })
       .catch(() => {});
+    fetch(`${ledgerBase}/api/book/services`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((sv: SiteService[] | null) => {
+        if (sv) setServices(sv);
+      })
+      .catch(() => {});
   }, [ledgerBase]);
+
+  const effectiveServices = useMemo(() => {
+    if (services && services.length) {
+      return services.map((s) => ({
+        name: s.name,
+        desc:
+          [s.durationMin ? `${s.durationMin} min` : "", s.priceNote || ""].filter(Boolean).join(" · ") ||
+          "Cuticle care and finish included.",
+        price: `$${Math.round(s.priceCents / 100)}`,
+        featured: (s.category || "").toLowerCase() === "signature" || /signature/i.test(s.name),
+      }));
+    }
+    return SERVICES;
+  }, [services]);
 
   const effectiveReviews = useMemo(
     () =>
@@ -423,9 +459,9 @@ function Home() {
               <div className="absolute inset-0 bg-gradient-to-t from-background/60 to-transparent" />
             </div>
             <div className="absolute -bottom-6 -right-4 hidden rounded-xl border border-border bg-background/80 p-5 backdrop-blur-md md:block">
-              <p className="text-eyebrow">Since 2019</p>
+              <p className="text-eyebrow">Since 2021</p>
               <p className="mt-2 text-2xl text-cream" style={{ fontFamily: "var(--font-serif)" }}>
-                6,400+ sets crafted
+                4.9★ · 77 reviews
               </p>
             </div>
           </div>
@@ -449,9 +485,9 @@ function Home() {
 
             <dl className="mt-10 grid grid-cols-2 gap-6 border-t border-border pt-8">
               {[
-                ["7 yrs", "In practice"],
+                ["5 yrs", "In practice"],
                 ["1:1", "Client capacity"],
-                ["4.9★", "300+ reviews"],
+                ["4.9★", "77 reviews"],
                 ["100%", "Sterile tools"],
               ].map(([n, l]) => (
                 <div key={l}>
@@ -483,7 +519,7 @@ function Home() {
           </div>
 
           <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {SERVICES.map((s) => (
+            {effectiveServices.map((s) => (
               <article
                 key={s.name}
                 className={`group relative flex flex-col justify-between overflow-hidden rounded-2xl border p-8 transition-all duration-500 hover:-translate-y-1 ${
@@ -533,6 +569,9 @@ function Home() {
           <h2 className="mt-4 text-display text-cream text-[clamp(2rem,5vw,3.25rem)]">
             Words from the studio.
           </h2>
+          <p className="mt-4 text-sm text-muted-foreground">
+            <span className="text-bronze-soft">4.9 ★</span> average from 77+ happy clients
+          </p>
 
           <div className="relative mt-12 min-h-[16rem] md:min-h-[14rem]">
             {effectiveReviews.map((t, i) => (
@@ -586,12 +625,12 @@ function Home() {
               </h2>
             </div>
             <a
-              href="https://instagram.com"
+              href="https://www.instagram.com/nxm_.nails/"
               target="_blank"
               rel="noreferrer"
               className="btn-ghost"
             >
-              <Instagram className="size-4" /> Follow @nxmnails
+              <Instagram className="size-4" /> Follow @nxm_.nails
             </a>
           </div>
 
@@ -599,7 +638,7 @@ function Home() {
             {igStrip.map((src, i) => (
               <a
                 key={i}
-                href="https://instagram.com"
+                href="https://www.instagram.com/nxm_.nails/"
                 target="_blank"
                 rel="noreferrer"
                 className="group relative block aspect-square overflow-hidden rounded-lg border border-border"
@@ -702,7 +741,7 @@ function Home() {
             </p>
             <div className="mt-6 flex gap-3">
               {[
-                [Instagram, "https://instagram.com", "Instagram"],
+                [Instagram, "https://www.instagram.com/nxm_.nails/", "Instagram"],
                 [Facebook, "https://facebook.com", "Facebook"],
                 [Mail, "mailto:hello@nxmnails.com", "Email"],
                 [Phone, "tel:+15550000000", "Phone"],
