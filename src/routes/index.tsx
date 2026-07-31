@@ -42,6 +42,7 @@ type SiteService = {
   durationMin: number;
   category: string | null;
   priceNote: string | null;
+  squeezeIn?: number | null;
 };
 type SiteHour = { weekday: number; open: string; close: string };
 
@@ -330,10 +331,14 @@ function Home() {
       return services.map((s) => ({
         name: s.name,
         desc:
-          [s.durationMin ? `${s.durationMin} min` : "", s.priceNote || ""]
+          [
+            s.durationMin ? `${s.durationMin} min` : "",
+            s.squeezeIn ? "squeeze-in +$10" : "",
+            s.priceNote || "",
+          ]
             .filter(Boolean)
             .join(" · ") || "Cuticle care and finish included.",
-        price: `$${Math.round(s.priceCents / 100)}`,
+        price: `$${Math.round((s.priceCents + (s.squeezeIn ? SQUEEZE_SURCHARGE_CENTS : 0)) / 100)}`,
         featured: (s.category || "").toLowerCase() === "signature" || /signature/i.test(s.name),
       }));
     }
@@ -979,7 +984,12 @@ type BookService = {
   durationMin: number;
   category: string | null;
   priceNote: string | null;
+  squeezeIn?: number | null;
 };
+
+// Squeeze-in surcharge (mirrors the ledger's SQUEEZE_SURCHARGE_CENTS).
+const SQUEEZE_SURCHARGE_CENTS = 1000;
+const bookPrice = (s: BookService) => s.priceCents + (s.squeezeIn ? SQUEEZE_SURCHARGE_CENTS : 0);
 
 const money = (c: number) => `$${Math.round(c / 100)}`;
 const prettyTime = (t: string) => {
@@ -1151,7 +1161,7 @@ function BookingModal({ base, onClose }: { base: string; onClose: () => void }) 
   const [error, setError] = useState("");
 
   // Squeeze-ins hinge on the (few) after-last-client times, so never thin them.
-  const isSqueeze = !!service && /squeeze/i.test(service.name);
+  const isSqueeze = !!service && (!!service.squeezeIn || /squeeze/i.test(service.name));
   const shownTimes = useMemo(
     () => (times ? (showAllTimes || isSqueeze ? times : thinTimes(times)) : []),
     [times, showAllTimes, isSqueeze],
@@ -1299,11 +1309,13 @@ function BookingModal({ base, onClose }: { base: string; onClose: () => void }) 
                               <div className="min-w-0">
                                 <p className="truncate text-cream">{s.name}</p>
                                 <p className="truncate text-xs text-muted-foreground">
-                                  {s.durationMin} min{s.priceNote ? ` · ${s.priceNote}` : ""}
+                                  {s.durationMin} min
+                                  {s.squeezeIn ? " · squeeze-in +$10" : ""}
+                                  {s.priceNote ? ` · ${s.priceNote}` : ""}
                                 </p>
                               </div>
                               <span className="shrink-0 text-bronze-soft">
-                                {money(s.priceCents)}
+                                {money(bookPrice(s))}
                               </span>
                             </button>
                           ))}
@@ -1317,8 +1329,13 @@ function BookingModal({ base, onClose }: { base: string; onClose: () => void }) 
             {step === "time" && service && (
               <div className="mt-5">
                 <p className="text-sm text-muted-foreground">
-                  {service.name} · {service.durationMin} min · {money(service.priceCents)}
+                  {service.name} · {service.durationMin} min · {money(bookPrice(service))}
                 </p>
+                {service.squeezeIn ? (
+                  <p className="mt-1 text-xs text-bronze-soft">
+                    Squeeze-in — fit in after the last appointment. $10 extra.
+                  </p>
+                ) : null}
                 <label className="mt-4 block text-eyebrow">Date</label>
                 <MiniCalendar
                   value={date}
@@ -1374,7 +1391,8 @@ function BookingModal({ base, onClose }: { base: string; onClose: () => void }) 
             {step === "details" && service && (
               <div className="mt-5 flex flex-col gap-3">
                 <p className="text-sm text-muted-foreground">
-                  {service.name} · {date} · {prettyTime(time)}
+                  {service.name} · {date} · {prettyTime(time)} · {money(bookPrice(service))}
+                  {service.squeezeIn ? " (incl. $10 squeeze-in)" : ""}
                 </p>
                 <label className="text-eyebrow">Your name</label>
                 <input
