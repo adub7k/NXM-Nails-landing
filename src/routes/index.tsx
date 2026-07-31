@@ -876,6 +876,7 @@ function BookingModal({ base, onClose }: { base: string; onClose: () => void }) 
   const [time, setTime] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
   const [openDays, setOpenDays] = useState<number[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -919,6 +920,7 @@ function BookingModal({ base, onClose }: { base: string; onClose: () => void }) 
           time,
           clientName: name.trim(),
           clientPhone: phone.trim(),
+          clientEmail: email.trim() || undefined,
         }),
       });
       const data = await res.json();
@@ -1070,6 +1072,15 @@ function BookingModal({ base, onClose }: { base: string; onClose: () => void }) 
                   inputMode="tel"
                   className="rounded-lg border border-border bg-background p-3 text-cream"
                   placeholder="(555) 555-5555"
+                />
+                <label className="text-eyebrow">Email (for confirmation)</label>
+                <input
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  inputMode="email"
+                  type="email"
+                  className="rounded-lg border border-border bg-background p-3 text-cream"
+                  placeholder="you@email.com"
                 />
                 {error && <p className="text-sm text-red-400">{error}</p>}
                 <div className="mt-2 flex gap-2">
