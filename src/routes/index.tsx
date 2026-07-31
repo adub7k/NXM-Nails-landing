@@ -39,11 +39,13 @@ type SiteService = {
   category: string | null;
   priceNote: string | null;
 };
+type SiteHour = { weekday: number; open: string; close: string };
 
 async function loadSiteData(): Promise<{
   manifest: SiteManifest | null;
   reviews: SiteReview[] | null;
   services: SiteService[] | null;
+  hours: SiteHour[] | null;
   ledgerBase: string;
 }> {
   const raw = typeof process !== "undefined" ? process.env.LEDGER_PUBLIC_URL : undefined;
@@ -54,13 +56,14 @@ async function loadSiteData(): Promise<{
   const base = /^http:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0)/.test(trimmed)
     ? trimmed
     : trimmed.replace(/^http:\/\//, "https://");
-  if (!base) return { manifest: null, reviews: null, services: null, ledgerBase: "" };
+  if (!base) return { manifest: null, reviews: null, services: null, hours: null, ledgerBase: "" };
   const abs = (i: ManifestImage | null) =>
     i ? { ...i, url: i.url.startsWith("http") ? i.url : `${base}${i.url}` } : null;
 
   let manifest: SiteManifest | null = null;
   let reviews: SiteReview[] | null = null;
   let services: SiteService[] | null = null;
+  let hours: SiteHour[] | null = null;
   try {
     const res = await fetch(`${base}/api/site/manifest`, { signal: AbortSignal.timeout(8000) });
     if (res.ok) {
@@ -82,7 +85,13 @@ async function loadSiteData(): Promise<{
   } catch {
     /* fall back to bundled menu */
   }
-  return { manifest, reviews, services, ledgerBase: base };
+  try {
+    const res = await fetch(`${base}/api/book/days`, { signal: AbortSignal.timeout(8000) });
+    if (res.ok) hours = ((await res.json()) as { hours?: SiteHour[] }).hours ?? null;
+  } catch {
+    /* fall back to static hours */
+  }
+  return { manifest, reviews, services, hours, ledgerBase: base };
 }
 
 export const Route = createFileRoute("/")({
@@ -113,7 +122,7 @@ export const Route = createFileRoute("/")({
           image: "/favicon.ico",
           description: "Luxury nail studio specializing in custom nail artistry.",
           priceRange: "$$$",
-          telephone: "+1-555-000-0000",
+          telephone: "+1-505-236-8383",
           address: { "@type": "PostalAddress", addressLocality: "New York", addressRegion: "NY", addressCountry: "US" },
           openingHours: ["Tu-Fr 10:00-19:00", "Sa 10:00-18:00"],
           sameAs: ["https://www.instagram.com/nxm_.nails/"],
@@ -183,6 +192,7 @@ function Home() {
   const [manifest, setManifest] = useState<SiteManifest | null>(loaderData.manifest);
   const [reviews, setReviews] = useState<SiteReview[] | null>(loaderData.reviews);
   const [services, setServices] = useState<SiteService[] | null>(loaderData.services);
+  const [hours, setHours] = useState<SiteHour[] | null>(loaderData.hours);
   const [bookingOpen, setBookingOpen] = useState(false);
 
   // Self-heal: re-fetch photos + reviews on the client so her latest content
@@ -209,7 +219,15 @@ function Home() {
         if (sv) setServices(sv);
       })
       .catch(() => {});
+    fetch(`${ledgerBase}/api/book/days`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { hours?: SiteHour[] } | null) => {
+        if (d?.hours) setHours(d.hours);
+      })
+      .catch(() => {});
   }, [ledgerBase]);
+
+  const hourLines = useMemo(() => formatHours(hours), [hours]);
 
   const effectiveServices = useMemo(() => {
     if (services && services.length) {
@@ -680,7 +698,7 @@ function Home() {
             <button type="button" className="btn-luxe" onClick={() => setBookingOpen(true)}>
               <Calendar className="size-4" /> Reserve now
             </button>
-            <a href="tel:+15550000000" className="btn-ghost">
+            <a href="tel:+15052368383" className="btn-ghost">
               <Phone className="size-4" /> Call the studio
             </a>
           </div>
@@ -744,7 +762,7 @@ function Home() {
                 [Instagram, "https://www.instagram.com/nxm_.nails/", "Instagram"],
                 [Facebook, "https://facebook.com", "Facebook"],
                 [Mail, "mailto:hello@nxmnails.com", "Email"],
-                [Phone, "tel:+15550000000", "Phone"],
+                [Phone, "tel:+15052368383", "Phone"],
               ].map(([Icon, href, label]) => {
                 const I = Icon as typeof Instagram;
                 return (
@@ -765,16 +783,18 @@ function Home() {
             <p className="text-eyebrow">Contact</p>
             <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
               <li className="flex items-center gap-2"><Mail className="size-4 text-bronze-soft" /> hello@nxmnails.com</li>
-              <li className="flex items-center gap-2"><Phone className="size-4 text-bronze-soft" /> (555) 000-0000</li>
+              <li className="flex items-center gap-2"><Phone className="size-4 text-bronze-soft" /> <a href="tel:+15052368383">505-236-8383</a></li>
             </ul>
           </div>
 
           <div>
             <p className="text-eyebrow">Studio hours</p>
             <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
-              <li className="flex items-center gap-2"><Clock className="size-4 text-bronze-soft" /> Tue – Fri · 10 – 7</li>
-              <li className="flex items-center gap-2"><Clock className="size-4 text-bronze-soft" /> Sat · 10 – 6</li>
-              <li className="flex items-center gap-2"><Clock className="size-4 text-bronze-soft" /> Sun · Closed</li>
+              {hourLines.map((line) => (
+                <li key={line} className="flex items-center gap-2">
+                  <Clock className="size-4 text-bronze-soft" /> {line}
+                </li>
+              ))}
             </ul>
           </div>
         </div>
@@ -816,6 +836,30 @@ const prettyTime = (t: string) => {
 
 const isoOfDate = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+// Turn ledger work hours into readable lines, grouping consecutive same-hours days.
+// Falls back to a sensible default when the ledger has none.
+function formatHours(hours: { weekday: number; open: string; close: string }[] | null): string[] {
+  const fallback = ["Mon – Sat · 9:00 AM – 2:30 PM", "Sun · Closed"];
+  if (!hours || hours.length === 0) return fallback;
+  const names = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const byDay = new Map(hours.map((h) => [h.weekday, h]));
+  const order = [1, 2, 3, 4, 5, 6, 0]; // Mon → Sun
+  const items = order.map((wd) => {
+    const h = byDay.get(wd);
+    return { label: names[wd], val: h ? `${prettyTime(h.open)} – ${prettyTime(h.close)}` : "Closed" };
+  });
+  const lines: string[] = [];
+  let i = 0;
+  while (i < items.length) {
+    let j = i;
+    while (j + 1 < items.length && items[j + 1].val === items[i].val) j++;
+    const label = i === j ? items[i].label : `${items[i].label} – ${items[j].label}`;
+    lines.push(`${label} · ${items[i].val}`);
+    i = j + 1;
+  }
+  return lines;
+}
 
 function MiniCalendar({
   value,
@@ -995,7 +1039,7 @@ function BookingModal({ base, onClose }: { base: string; onClose: () => void }) 
         {!base ? (
           <div className="py-10 text-center">
             <p className="text-cream">Online booking is being set up.</p>
-            <a href="tel:+15550000000" className="btn-luxe mt-6 inline-flex">
+            <a href="tel:+15052368383" className="btn-luxe mt-6 inline-flex">
               <Phone className="size-4" /> Call to book
             </a>
           </div>
