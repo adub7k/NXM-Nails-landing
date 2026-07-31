@@ -10,6 +10,8 @@ import {
   Star,
   ArrowUpRight,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Sparkles,
   Menu,
   X,
@@ -122,10 +124,10 @@ const TESTIMONIALS = [
 ];
 
 const FAQ = [
-  { q: "Is a deposit required?", a: "Yes — a non-refundable $25 deposit secures your appointment and is applied toward your service." },
-  { q: "What is your cancellation policy?", a: "Please reschedule at least 48 hours in advance. Late cancellations forfeit the deposit." },
-  { q: "How long does a full set take?", a: "Full sets take 2 to 3 hours depending on shape, length, and art. Please plan accordingly." },
-  { q: "Do you accept walk-ins?", a: "NXM is by appointment only to ensure every client receives full, unhurried attention." },
+  { q: "How do I book?", a: "Tap Reserve now, choose your service, and pick an open time — you'll get a confirmation text." },
+  { q: "How long does a set take?", a: "Anywhere from about 45 minutes to 2.5 hours depending on the service, shape, length, and art. Each booking reserves the right amount of time." },
+  { q: "What should I bring?", a: "Just yourself — arrive with clean, product-free nails so your set lasts." },
+  { q: "Do you accept walk-ins?", a: "NXM is by appointment only, so every client gets full, unhurried attention." },
 ];
 
 function Home() {
@@ -577,8 +579,8 @@ function Home() {
             Reserve your <em className="not-italic text-bronze-soft">appointment.</em>
           </h2>
           <p className="mx-auto mt-6 max-w-xl text-base leading-relaxed text-muted-foreground">
-            A $25 deposit is required to secure your slot and is applied to your
-            service. Please arrive with clean, product-free nails.
+            Pick your service and a time that works — it takes a minute. Please arrive with clean,
+            product-free nails.
           </p>
           <div className="mt-10 flex flex-wrap justify-center gap-3">
             <button type="button" className="btn-luxe" onClick={() => setBookingOpen(true)}>
@@ -589,18 +591,6 @@ function Home() {
             </a>
           </div>
 
-          <div className="mx-auto mt-14 grid max-w-3xl gap-4 sm:grid-cols-3 text-left">
-            {[
-              ["Deposit", "$25 non-refundable, applied to your service."],
-              ["Cancellations", "Reschedule 48h in advance to preserve deposit."],
-              ["Late arrivals", "15+ minutes may require rescheduling."],
-            ].map(([h, b]) => (
-              <div key={h} className="rounded-xl border border-border bg-surface/60 p-5">
-                <p className="text-eyebrow">{h}</p>
-                <p className="mt-3 text-sm text-muted-foreground">{b}</p>
-              </div>
-            ))}
-          </div>
         </div>
       </section>
 
@@ -730,6 +720,98 @@ const prettyTime = (t: string) => {
   return new Date(2000, 0, 1, h, m).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 };
 
+const isoOfDate = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+function MiniCalendar({
+  value,
+  onChange,
+  openWeekdays,
+}: {
+  value: string;
+  onChange: (d: string) => void;
+  openWeekdays: number[] | null;
+}) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const maxTime = today.getTime() + 90 * 86400000;
+  const [cursor, setCursor] = useState(() => {
+    const base = value ? new Date(`${value}T00:00:00`) : new Date();
+    return new Date(base.getFullYear(), base.getMonth(), 1);
+  });
+
+  const year = cursor.getFullYear();
+  const month = cursor.getMonth();
+  const startPad = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const cells: (Date | null)[] = [
+    ...Array.from({ length: startPad }, () => null),
+    ...Array.from({ length: daysInMonth }, (_, i) => new Date(year, month, i + 1)),
+  ];
+
+  const canPrev = new Date(year, month, 1) > new Date(today.getFullYear(), today.getMonth(), 1);
+  const canNext = new Date(year, month + 1, 1).getTime() <= maxTime;
+
+  return (
+    <div className="mt-2 rounded-lg border border-border bg-background p-3">
+      <div className="flex items-center justify-between">
+        <button
+          type="button"
+          disabled={!canPrev}
+          onClick={() => setCursor(new Date(year, month - 1, 1))}
+          className="rounded p-1 text-cream disabled:opacity-30"
+          aria-label="Previous month"
+        >
+          <ChevronLeft className="size-4" />
+        </button>
+        <span className="text-sm text-cream">
+          {cursor.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+        </span>
+        <button
+          type="button"
+          disabled={!canNext}
+          onClick={() => setCursor(new Date(year, month + 1, 1))}
+          className="rounded p-1 text-cream disabled:opacity-30"
+          aria-label="Next month"
+        >
+          <ChevronRight className="size-4" />
+        </button>
+      </div>
+      <div className="mt-2 grid grid-cols-7 gap-1 text-center">
+        {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
+          <span key={i} className="text-[0.6rem] uppercase tracking-wider text-muted-foreground">
+            {d}
+          </span>
+        ))}
+        {cells.map((d, i) => {
+          if (!d) return <span key={i} />;
+          const iso = isoOfDate(d);
+          const closed = openWeekdays ? !openWeekdays.includes(d.getDay()) : false;
+          const disabled = d.getTime() < today.getTime() || d.getTime() > maxTime || closed;
+          const selected = iso === value;
+          return (
+            <button
+              key={iso}
+              type="button"
+              disabled={disabled}
+              onClick={() => onChange(iso)}
+              className={`aspect-square rounded-md text-sm transition-colors ${
+                selected
+                  ? "bg-bronze text-background"
+                  : disabled
+                    ? "text-muted-foreground/30"
+                    : "text-cream hover:bg-surface"
+              }`}
+            >
+              {d.getDate()}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function BookingModal({ base, onClose }: { base: string; onClose: () => void }) {
   const [step, setStep] = useState<"service" | "time" | "details" | "done">("service");
   const [services, setServices] = useState<BookService[] | null>(null);
@@ -739,11 +821,9 @@ function BookingModal({ base, onClose }: { base: string; onClose: () => void }) 
   const [time, setTime] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [openDays, setOpenDays] = useState<number[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const maxStr = new Date(Date.now() + 90 * 86400000).toISOString().slice(0, 10);
 
   useEffect(() => {
     if (!base) return;
@@ -751,6 +831,10 @@ function BookingModal({ base, onClose }: { base: string; onClose: () => void }) 
       .then((r) => r.json())
       .then((s: BookService[]) => setServices(s))
       .catch(() => setServices([]));
+    fetch(`${base}/api/book/days`)
+      .then((r) => r.json())
+      .then((d: { weekdays: number[] }) => setOpenDays(d.weekdays ?? []))
+      .catch(() => setOpenDays([]));
   }, [base]);
 
   useEffect(() => {
@@ -878,14 +962,7 @@ function BookingModal({ base, onClose }: { base: string; onClose: () => void }) 
                   {service.name} · {service.durationMin} min · {money(service.priceCents)}
                 </p>
                 <label className="mt-4 block text-eyebrow">Date</label>
-                <input
-                  type="date"
-                  min={todayStr}
-                  max={maxStr}
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                  className="mt-2 w-full rounded-lg border border-border bg-background p-3 text-cream"
-                />
+                <MiniCalendar value={date} onChange={setDate} openWeekdays={openDays} />
                 {date && (
                   <>
                     <label className="mt-5 block text-eyebrow">Open times</label>
