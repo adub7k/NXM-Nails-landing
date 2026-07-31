@@ -1025,11 +1025,13 @@ function MiniCalendar({
   onChange,
   openWeekdays,
   maxAdvanceDays = 90,
+  availableDates,
 }: {
   value: string;
   onChange: (d: string) => void;
   openWeekdays: number[] | null;
   maxAdvanceDays?: number;
+  availableDates?: Set<string> | null;
 }) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -1086,7 +1088,10 @@ function MiniCalendar({
           if (!d) return <span key={i} />;
           const iso = isoOfDate(d);
           const closed = openWeekdays ? !openWeekdays.includes(d.getDay()) : false;
-          const disabled = d.getTime() < today.getTime() || d.getTime() > maxTime || closed;
+          // Once we know which dates actually have an open slot, gray out the rest
+          // (fully-booked days), not just closed weekdays.
+          const full = availableDates ? !availableDates.has(iso) : false;
+          const disabled = d.getTime() < today.getTime() || d.getTime() > maxTime || closed || full;
           const selected = iso === value;
           return (
             <button
@@ -1123,6 +1128,7 @@ function BookingModal({ base, onClose }: { base: string; onClose: () => void }) 
   const [email, setEmail] = useState("");
   const [openDays, setOpenDays] = useState<number[] | null>(null);
   const [maxAdvanceDays, setMaxAdvanceDays] = useState(90);
+  const [openDates, setOpenDates] = useState<Set<string> | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -1140,6 +1146,16 @@ function BookingModal({ base, onClose }: { base: string; onClose: () => void }) 
       })
       .catch(() => setOpenDays([]));
   }, [base]);
+
+  // Which dates have any open slot for the chosen service — to gray out full days.
+  useEffect(() => {
+    if (!service || !base) return;
+    setOpenDates(null);
+    fetch(`${base}/api/book/open-dates?serviceId=${service.id}`)
+      .then((r) => r.json())
+      .then((d: { dates: string[] }) => setOpenDates(new Set(d.dates ?? [])))
+      .catch(() => setOpenDates(null));
+  }, [service, base]);
 
   useEffect(() => {
     if (!service || !date || !base) return;
@@ -1282,6 +1298,7 @@ function BookingModal({ base, onClose }: { base: string; onClose: () => void }) 
                   onChange={setDate}
                   openWeekdays={openDays}
                   maxAdvanceDays={maxAdvanceDays}
+                  availableDates={openDates}
                 />
                 {date && (
                   <>
