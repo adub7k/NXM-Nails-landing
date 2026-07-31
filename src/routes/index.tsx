@@ -34,10 +34,12 @@ type SiteManifest = { hero: ManifestImage | null; about: ManifestImage | null; g
 
 async function loadSiteData(): Promise<{ manifest: SiteManifest | null; ledgerBase: string }> {
   const raw = typeof process !== "undefined" ? process.env.LEDGER_PUBLIC_URL : undefined;
-  const base = raw?.replace(/\/$/, "") ?? "";
+  // Normalize: drop trailing slash, and upgrade http→https so the (https) site
+  // doesn't block ledger images as mixed content.
+  const base = raw?.trim().replace(/\/+$/, "").replace(/^http:\/\//, "https://") ?? "";
   if (!base) return { manifest: null, ledgerBase: "" };
   try {
-    const res = await fetch(`${base}/api/site/manifest`, { signal: AbortSignal.timeout(4000) });
+    const res = await fetch(`${base}/api/site/manifest`, { signal: AbortSignal.timeout(8000) });
     if (!res.ok) return { manifest: null, ledgerBase: base };
     const m = (await res.json()) as SiteManifest;
     const abs = (i: ManifestImage | null) =>
@@ -149,8 +151,25 @@ function Home() {
     return () => clearInterval(id);
   }, []);
 
-  const { manifest, ledgerBase } = Route.useLoaderData();
+  const loaderData = Route.useLoaderData();
+  const ledgerBase = loaderData.ledgerBase;
+  const [manifest, setManifest] = useState<SiteManifest | null>(loaderData.manifest);
   const [bookingOpen, setBookingOpen] = useState(false);
+
+  // Self-heal: re-fetch photos on the client so her uploads always appear even
+  // if the server-render fetch missed (e.g. the ledger was cold-starting).
+  useEffect(() => {
+    if (!ledgerBase) return;
+    const abs = (i: ManifestImage | null) =>
+      i ? { ...i, url: i.url.startsWith("http") ? i.url : `${ledgerBase}${i.url}` } : null;
+    fetch(`${ledgerBase}/api/site/manifest`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((m: SiteManifest | null) => {
+        if (m) setManifest({ hero: abs(m.hero), about: abs(m.about), gallery: (m.gallery ?? []).map((g) => abs(g)!).filter(Boolean) });
+      })
+      .catch(() => {});
+  }, [ledgerBase]);
+
   const heroSrc = manifest?.hero?.url ?? hero;
   const aboutSrc = manifest?.about?.url ?? about;
 
