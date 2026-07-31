@@ -31,26 +31,43 @@ import g8 from "@/assets/g8.jpg";
 // --- Photos managed from the ledger app (falls back to the bundled images) ---
 type ManifestImage = { url: string; tag: string | null; alt: string | null };
 type SiteManifest = { hero: ManifestImage | null; about: ManifestImage | null; gallery: ManifestImage[] };
+type SiteReview = { author: string; rating: number; text: string; role: string | null };
 
-async function loadSiteData(): Promise<{ manifest: SiteManifest | null; ledgerBase: string }> {
+async function loadSiteData(): Promise<{
+  manifest: SiteManifest | null;
+  reviews: SiteReview[] | null;
+  ledgerBase: string;
+}> {
   const raw = typeof process !== "undefined" ? process.env.LEDGER_PUBLIC_URL : undefined;
-  // Normalize: drop trailing slash, and upgrade http→https so the (https) site
-  // doesn't block ledger images as mixed content.
-  const base = raw?.trim().replace(/\/+$/, "").replace(/^http:\/\//, "https://") ?? "";
-  if (!base) return { manifest: null, ledgerBase: "" };
+  // Normalize: drop trailing slash; upgrade http→https for real hosts so the
+  // (https) site doesn't block ledger content as mixed content — but leave
+  // localhost as http for local dev.
+  const trimmed = raw?.trim().replace(/\/+$/, "") ?? "";
+  const base = /^http:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0)/.test(trimmed)
+    ? trimmed
+    : trimmed.replace(/^http:\/\//, "https://");
+  if (!base) return { manifest: null, reviews: null, ledgerBase: "" };
+  const abs = (i: ManifestImage | null) =>
+    i ? { ...i, url: i.url.startsWith("http") ? i.url : `${base}${i.url}` } : null;
+
+  let manifest: SiteManifest | null = null;
+  let reviews: SiteReview[] | null = null;
   try {
     const res = await fetch(`${base}/api/site/manifest`, { signal: AbortSignal.timeout(8000) });
-    if (!res.ok) return { manifest: null, ledgerBase: base };
-    const m = (await res.json()) as SiteManifest;
-    const abs = (i: ManifestImage | null) =>
-      i ? { ...i, url: i.url.startsWith("http") ? i.url : `${base}${i.url}` } : null;
-    return {
-      manifest: { hero: abs(m.hero), about: abs(m.about), gallery: (m.gallery ?? []).map((g) => abs(g)!) },
-      ledgerBase: base,
-    };
+    if (res.ok) {
+      const m = (await res.json()) as SiteManifest;
+      manifest = { hero: abs(m.hero), about: abs(m.about), gallery: (m.gallery ?? []).map((g) => abs(g)!) };
+    }
   } catch {
-    return { manifest: null, ledgerBase: base };
+    /* fall back to bundled images */
   }
+  try {
+    const res = await fetch(`${base}/api/site/reviews`, { signal: AbortSignal.timeout(8000) });
+    if (res.ok) reviews = (await res.json()) as SiteReview[];
+  } catch {
+    /* fall back to sample testimonials */
+  }
+  return { manifest, reviews, ledgerBase: base };
 }
 
 export const Route = createFileRoute("/")({
@@ -146,18 +163,14 @@ function Home() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  useEffect(() => {
-    const id = setInterval(() => setTestimonial((i) => (i + 1) % TESTIMONIALS.length), 6000);
-    return () => clearInterval(id);
-  }, []);
-
   const loaderData = Route.useLoaderData();
   const ledgerBase = loaderData.ledgerBase;
   const [manifest, setManifest] = useState<SiteManifest | null>(loaderData.manifest);
+  const [reviews, setReviews] = useState<SiteReview[] | null>(loaderData.reviews);
   const [bookingOpen, setBookingOpen] = useState(false);
 
-  // Self-heal: re-fetch photos on the client so her uploads always appear even
-  // if the server-render fetch missed (e.g. the ledger was cold-starting).
+  // Self-heal: re-fetch photos + reviews on the client so her latest content
+  // always appears even if the server-render fetch missed (ledger cold start).
   useEffect(() => {
     if (!ledgerBase) return;
     const abs = (i: ManifestImage | null) =>
@@ -168,7 +181,28 @@ function Home() {
         if (m) setManifest({ hero: abs(m.hero), about: abs(m.about), gallery: (m.gallery ?? []).map((g) => abs(g)!).filter(Boolean) });
       })
       .catch(() => {});
+    fetch(`${ledgerBase}/api/site/reviews`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((rv: SiteReview[] | null) => {
+        if (rv) setReviews(rv);
+      })
+      .catch(() => {});
   }, [ledgerBase]);
+
+  const effectiveReviews = useMemo(
+    () =>
+      reviews && reviews.length
+        ? reviews.map((r) => ({ name: r.author, text: r.text, role: r.role ?? "", rating: r.rating }))
+        : TESTIMONIALS.map((t) => ({ ...t, rating: 5 })),
+    [reviews],
+  );
+
+  useEffect(() => {
+    const n = effectiveReviews.length;
+    if (n <= 1) return;
+    const id = setInterval(() => setTestimonial((i) => (i + 1) % n), 6000);
+    return () => clearInterval(id);
+  }, [effectiveReviews.length]);
 
   const heroSrc = manifest?.hero?.url ?? hero;
   const aboutSrc = manifest?.about?.url ?? about;
@@ -501,15 +535,17 @@ function Home() {
           </h2>
 
           <div className="relative mt-12 min-h-[16rem] md:min-h-[14rem]">
-            {TESTIMONIALS.map((t, i) => (
+            {effectiveReviews.map((t, i) => (
               <blockquote
-                key={t.name}
+                key={`${t.name}-${i}`}
                 className={`absolute inset-0 flex flex-col items-center justify-center transition-all duration-700 ${
-                  i === testimonial ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3 pointer-events-none"
+                  i === testimonial % effectiveReviews.length
+                    ? "opacity-100 translate-y-0"
+                    : "opacity-0 translate-y-3 pointer-events-none"
                 }`}
               >
                 <div className="flex gap-1 text-bronze-soft">
-                  {Array.from({ length: 5 }).map((_, k) => (
+                  {Array.from({ length: Math.max(1, Math.min(5, t.rating)) }).map((_, k) => (
                     <Star key={k} className="size-4 fill-current" />
                   ))}
                 </div>
@@ -518,20 +554,20 @@ function Home() {
                 </p>
                 <footer className="mt-6">
                   <p className="text-sm text-cream">{t.name}</p>
-                  <p className="text-eyebrow mt-1 text-muted-foreground">{t.role}</p>
+                  {t.role && <p className="text-eyebrow mt-1 text-muted-foreground">{t.role}</p>}
                 </footer>
               </blockquote>
             ))}
           </div>
 
           <div className="mt-8 flex justify-center gap-2">
-            {TESTIMONIALS.map((_, i) => (
+            {effectiveReviews.map((_, i) => (
               <button
                 key={i}
                 onClick={() => setTestimonial(i)}
-                aria-label={`Testimonial ${i + 1}`}
+                aria-label={`Review ${i + 1}`}
                 className={`h-1.5 rounded-full transition-all ${
-                  i === testimonial ? "w-8 bg-bronze" : "w-1.5 bg-border"
+                  i === testimonial % effectiveReviews.length ? "w-8 bg-bronze" : "w-1.5 bg-border"
                 }`}
               />
             ))}
