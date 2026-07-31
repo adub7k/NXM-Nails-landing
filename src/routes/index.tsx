@@ -1150,9 +1150,11 @@ function BookingModal({ base, onClose }: { base: string; onClose: () => void }) 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
+  // Squeeze-ins hinge on the (few) after-last-client times, so never thin them.
+  const isSqueeze = !!service && /squeeze/i.test(service.name);
   const shownTimes = useMemo(
-    () => (times ? (showAllTimes ? times : thinTimes(times)) : []),
-    [times, showAllTimes],
+    () => (times ? (showAllTimes || isSqueeze ? times : thinTimes(times)) : []),
+    [times, showAllTimes, isSqueeze],
   );
   const hasMoreTimes = !!times && shownTimes.length < times.length;
 
