@@ -30,19 +30,22 @@ import g8 from "@/assets/g8.jpg";
 type ManifestImage = { url: string; tag: string | null; alt: string | null };
 type SiteManifest = { hero: ManifestImage | null; about: ManifestImage | null; gallery: ManifestImage[] };
 
-async function loadManifest(): Promise<SiteManifest | null> {
+async function loadSiteData(): Promise<{ manifest: SiteManifest | null; ledgerBase: string }> {
   const raw = typeof process !== "undefined" ? process.env.LEDGER_PUBLIC_URL : undefined;
-  const base = raw?.replace(/\/$/, "");
-  if (!base) return null;
+  const base = raw?.replace(/\/$/, "") ?? "";
+  if (!base) return { manifest: null, ledgerBase: "" };
   try {
     const res = await fetch(`${base}/api/site/manifest`, { signal: AbortSignal.timeout(4000) });
-    if (!res.ok) return null;
+    if (!res.ok) return { manifest: null, ledgerBase: base };
     const m = (await res.json()) as SiteManifest;
     const abs = (i: ManifestImage | null) =>
       i ? { ...i, url: i.url.startsWith("http") ? i.url : `${base}${i.url}` } : null;
-    return { hero: abs(m.hero), about: abs(m.about), gallery: (m.gallery ?? []).map((g) => abs(g)!) };
+    return {
+      manifest: { hero: abs(m.hero), about: abs(m.about), gallery: (m.gallery ?? []).map((g) => abs(g)!) },
+      ledgerBase: base,
+    };
   } catch {
-    return null;
+    return { manifest: null, ledgerBase: base };
   }
 }
 
@@ -82,7 +85,7 @@ export const Route = createFileRoute("/")({
       },
     ],
   }),
-  loader: () => loadManifest(),
+  loader: () => loadSiteData(),
   component: Home,
 });
 
@@ -144,7 +147,8 @@ function Home() {
     return () => clearInterval(id);
   }, []);
 
-  const manifest = Route.useLoaderData();
+  const { manifest, ledgerBase } = Route.useLoaderData();
+  const [bookingOpen, setBookingOpen] = useState(false);
   const heroSrc = manifest?.hero?.url ?? hero;
   const aboutSrc = manifest?.about?.url ?? about;
 
@@ -577,9 +581,9 @@ function Home() {
             service. Please arrive with clean, product-free nails.
           </p>
           <div className="mt-10 flex flex-wrap justify-center gap-3">
-            <a href="#" className="btn-luxe">
+            <button type="button" className="btn-luxe" onClick={() => setBookingOpen(true)}>
               <Calendar className="size-4" /> Reserve now
-            </a>
+            </button>
             <a href="tel:+15550000000" className="btn-ghost">
               <Phone className="size-4" /> Call the studio
             </a>
@@ -698,12 +702,259 @@ function Home() {
       </footer>
 
       {/* Sticky mobile book button */}
-      <a
-        href="#booking"
+      <button
+        type="button"
+        onClick={() => setBookingOpen(true)}
         className="fixed bottom-5 right-5 z-40 inline-flex items-center gap-2 rounded-full border border-bronze/30 bg-background/80 px-5 py-3 text-[0.72rem] uppercase tracking-[0.22em] text-cream shadow-luxe backdrop-blur-xl md:hidden"
       >
         <Calendar className="size-4 text-bronze-soft" /> Book now
-      </a>
+      </button>
+
+      {bookingOpen && <BookingModal base={ledgerBase} onClose={() => setBookingOpen(false)} />}
+    </div>
+  );
+}
+
+type BookService = {
+  id: string;
+  name: string;
+  priceCents: number;
+  durationMin: number;
+  category: string | null;
+  priceNote: string | null;
+};
+
+const money = (c: number) => `$${Math.round(c / 100)}`;
+const prettyTime = (t: string) => {
+  const [h, m] = t.split(":").map(Number);
+  return new Date(2000, 0, 1, h, m).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+};
+
+function BookingModal({ base, onClose }: { base: string; onClose: () => void }) {
+  const [step, setStep] = useState<"service" | "time" | "details" | "done">("service");
+  const [services, setServices] = useState<BookService[] | null>(null);
+  const [service, setService] = useState<BookService | null>(null);
+  const [date, setDate] = useState("");
+  const [times, setTimes] = useState<string[] | null>(null);
+  const [time, setTime] = useState("");
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const maxStr = new Date(Date.now() + 90 * 86400000).toISOString().slice(0, 10);
+
+  useEffect(() => {
+    if (!base) return;
+    fetch(`${base}/api/book/services`)
+      .then((r) => r.json())
+      .then((s: BookService[]) => setServices(s))
+      .catch(() => setServices([]));
+  }, [base]);
+
+  useEffect(() => {
+    if (!service || !date || !base) return;
+    setTimes(null);
+    setTime("");
+    fetch(`${base}/api/book/availability?date=${date}&serviceId=${service.id}`)
+      .then((r) => r.json())
+      .then((d: { times: string[] }) => setTimes(d.times ?? []))
+      .catch(() => setTimes([]));
+  }, [service, date, base]);
+
+  async function submit() {
+    if (!service || !name.trim() || !phone.trim()) {
+      setError("Please add your name and phone.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      const res = await fetch(`${base}/api/book/create`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          serviceId: service.id,
+          date,
+          time,
+          clientName: name.trim(),
+          clientPhone: phone.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (data.ok) setStep("done");
+      else setError(data.error || "Something went wrong. Please try again.");
+    } catch {
+      setError("Couldn't reach the studio. Please try again or call.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const groups = services
+    ? [...new Map(services.map((s) => [s.category || "Services", true])).keys()]
+    : [];
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-end justify-center bg-background/80 p-0 backdrop-blur-sm sm:items-center sm:p-4"
+      onClick={onClose}
+    >
+      <div
+        className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-2xl border border-border bg-surface p-6 shadow-luxe sm:rounded-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between">
+          <p className="text-eyebrow">Book with NXM</p>
+          <button onClick={onClose} className="text-muted-foreground hover:text-cream" aria-label="Close">
+            <X className="size-5" />
+          </button>
+        </div>
+
+        {!base ? (
+          <div className="py-10 text-center">
+            <p className="text-cream">Online booking is being set up.</p>
+            <a href="tel:+15550000000" className="btn-luxe mt-6 inline-flex">
+              <Phone className="size-4" /> Call to book
+            </a>
+          </div>
+        ) : step === "done" ? (
+          <div className="py-10 text-center">
+            <h3 className="text-display text-cream text-3xl">You're booked.</h3>
+            <p className="mx-auto mt-4 max-w-sm text-sm text-muted-foreground">
+              {service?.name} on {date} at {prettyTime(time)}. We'll text {phone} to confirm. See you
+              soon, {name.split(" ")[0]}!
+            </p>
+            <button className="btn-luxe mt-8" onClick={onClose}>
+              Done
+            </button>
+          </div>
+        ) : (
+          <>
+            <h3 className="mt-2 text-display text-cream text-3xl">
+              {step === "service" ? "Choose a service" : step === "time" ? "Pick a time" : "Your details"}
+            </h3>
+
+            {step === "service" && (
+              <div className="mt-5 flex flex-col gap-5">
+                {services === null ? (
+                  <p className="text-sm text-muted-foreground">Loading services…</p>
+                ) : (
+                  groups.map((cat) => (
+                    <div key={cat}>
+                      <p className="text-eyebrow mb-2">{cat}</p>
+                      <div className="flex flex-col gap-2">
+                        {services
+                          .filter((s) => (s.category || "Services") === cat)
+                          .map((s) => (
+                            <button
+                              key={s.id}
+                              onClick={() => {
+                                setService(s);
+                                setStep("time");
+                              }}
+                              className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface/60 p-4 text-left transition-colors hover:border-bronze/50"
+                            >
+                              <div className="min-w-0">
+                                <p className="truncate text-cream">{s.name}</p>
+                                <p className="truncate text-xs text-muted-foreground">
+                                  {s.durationMin} min{s.priceNote ? ` · ${s.priceNote}` : ""}
+                                </p>
+                              </div>
+                              <span className="shrink-0 text-bronze-soft">{money(s.priceCents)}</span>
+                            </button>
+                          ))}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            {step === "time" && service && (
+              <div className="mt-5">
+                <p className="text-sm text-muted-foreground">
+                  {service.name} · {service.durationMin} min · {money(service.priceCents)}
+                </p>
+                <label className="mt-4 block text-eyebrow">Date</label>
+                <input
+                  type="date"
+                  min={todayStr}
+                  max={maxStr}
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  className="mt-2 w-full rounded-lg border border-border bg-background p-3 text-cream"
+                />
+                {date && (
+                  <>
+                    <label className="mt-5 block text-eyebrow">Open times</label>
+                    {times === null ? (
+                      <p className="mt-2 text-sm text-muted-foreground">Checking availability…</p>
+                    ) : times.length === 0 ? (
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        No openings that day — try another date.
+                      </p>
+                    ) : (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {times.map((t) => (
+                          <button
+                            key={t}
+                            onClick={() => {
+                              setTime(t);
+                              setStep("details");
+                            }}
+                            className="rounded-full border border-border bg-surface/60 px-4 py-2 text-sm text-cream transition-colors hover:border-bronze/50"
+                          >
+                            {prettyTime(t)}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+                <button className="btn-ghost mt-8" onClick={() => setStep("service")}>
+                  Back
+                </button>
+              </div>
+            )}
+
+            {step === "details" && service && (
+              <div className="mt-5 flex flex-col gap-3">
+                <p className="text-sm text-muted-foreground">
+                  {service.name} · {date} · {prettyTime(time)}
+                </p>
+                <label className="text-eyebrow">Your name</label>
+                <input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="rounded-lg border border-border bg-background p-3 text-cream"
+                  placeholder="First & last name"
+                />
+                <label className="text-eyebrow">Phone</label>
+                <input
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  inputMode="tel"
+                  className="rounded-lg border border-border bg-background p-3 text-cream"
+                  placeholder="(555) 555-5555"
+                />
+                {error && <p className="text-sm text-red-400">{error}</p>}
+                <div className="mt-2 flex gap-2">
+                  <button className="btn-ghost" onClick={() => setStep("time")}>
+                    Back
+                  </button>
+                  <button className="btn-luxe flex-1" onClick={submit} disabled={busy}>
+                    {busy ? "Booking…" : "Confirm booking"}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {error && step !== "details" && <p className="mt-4 text-sm text-red-400">{error}</p>}
+          </>
+        )}
+      </div>
     </div>
   );
 }
