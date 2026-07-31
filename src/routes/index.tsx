@@ -1020,6 +1020,23 @@ function formatHours(hours: { weekday: number; open: string; close: string }[] |
   return lines;
 }
 
+// Trim a dense slot list (every interval) down to a spaced, soonest-first
+// shortlist so clients aren't flooded — a short service like a squeeze-in
+// otherwise fits all over an open day. "Show all times" reveals the rest.
+function thinTimes(times: string[], stepMin = 30): string[] {
+  const out: string[] = [];
+  let last = -Infinity;
+  for (const t of times) {
+    const [h, m] = t.split(":").map(Number);
+    const mins = h * 60 + m;
+    if (mins - last >= stepMin) {
+      out.push(t);
+      last = mins;
+    }
+  }
+  return out;
+}
+
 function MiniCalendar({
   value,
   onChange,
@@ -1129,8 +1146,15 @@ function BookingModal({ base, onClose }: { base: string; onClose: () => void }) 
   const [openDays, setOpenDays] = useState<number[] | null>(null);
   const [maxAdvanceDays, setMaxAdvanceDays] = useState(90);
   const [openDates, setOpenDates] = useState<Set<string> | null>(null);
+  const [showAllTimes, setShowAllTimes] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+
+  const shownTimes = useMemo(
+    () => (times ? (showAllTimes ? times : thinTimes(times)) : []),
+    [times, showAllTimes],
+  );
+  const hasMoreTimes = !!times && shownTimes.length < times.length;
 
   useEffect(() => {
     if (!base) return;
@@ -1161,6 +1185,7 @@ function BookingModal({ base, onClose }: { base: string; onClose: () => void }) 
     if (!service || !date || !base) return;
     setTimes(null);
     setTime("");
+    setShowAllTimes(false);
     fetch(`${base}/api/book/availability?date=${date}&serviceId=${service.id}`)
       .then((r) => r.json())
       .then((d: { times: string[] }) => setTimes(d.times ?? []))
@@ -1310,20 +1335,31 @@ function BookingModal({ base, onClose }: { base: string; onClose: () => void }) 
                         No openings that day — try another date.
                       </p>
                     ) : (
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {times.map((t) => (
+                      <>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {shownTimes.map((t) => (
+                            <button
+                              key={t}
+                              onClick={() => {
+                                setTime(t);
+                                setStep("details");
+                              }}
+                              className="rounded-full border border-border bg-surface/60 px-4 py-2 text-sm text-cream transition-colors hover:border-bronze/50"
+                            >
+                              {prettyTime(t)}
+                            </button>
+                          ))}
+                        </div>
+                        {hasMoreTimes && (
                           <button
-                            key={t}
-                            onClick={() => {
-                              setTime(t);
-                              setStep("details");
-                            }}
-                            className="rounded-full border border-border bg-surface/60 px-4 py-2 text-sm text-cream transition-colors hover:border-bronze/50"
+                            type="button"
+                            onClick={() => setShowAllTimes(true)}
+                            className="mt-3 text-[0.7rem] uppercase tracking-[0.2em] text-bronze-soft transition-colors hover:text-cream"
                           >
-                            {prettyTime(t)}
+                            Show all times
                           </button>
-                        ))}
-                      </div>
+                        )}
+                      </>
                     )}
                   </>
                 )}
