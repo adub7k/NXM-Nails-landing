@@ -30,7 +30,11 @@ import g8 from "@/assets/g8.jpg";
 
 // --- Photos managed from the ledger app (falls back to the bundled images) ---
 type ManifestImage = { url: string; tag: string | null; alt: string | null };
-type SiteManifest = { hero: ManifestImage | null; about: ManifestImage | null; gallery: ManifestImage[] };
+type SiteManifest = {
+  hero: ManifestImage | null;
+  about: ManifestImage | null;
+  gallery: ManifestImage[];
+};
 type SiteReview = { author: string; rating: number; text: string; role: string | null };
 type SiteService = {
   name: string;
@@ -68,7 +72,11 @@ async function loadSiteData(): Promise<{
     const res = await fetch(`${base}/api/site/manifest`, { signal: AbortSignal.timeout(8000) });
     if (res.ok) {
       const m = (await res.json()) as SiteManifest;
-      manifest = { hero: abs(m.hero), about: abs(m.about), gallery: (m.gallery ?? []).map((g) => abs(g)!) };
+      manifest = {
+        hero: abs(m.hero),
+        about: abs(m.about),
+        gallery: (m.gallery ?? []).map((g) => abs(g)!),
+      };
     }
   } catch {
     /* fall back to bundled images */
@@ -103,13 +111,24 @@ export const Route = createFileRoute("/")({
         content:
           "NXM Nails is a luxury nail studio specializing in gel, acrylic, chrome, matte, and custom nail art. Book an appointment for editorial-grade craftsmanship.",
       },
-      { name: "keywords", content: "NXM Nails, custom nail artistry, nail salon, acrylic nails, gel nails, chrome nails, nail artist, custom nail art" },
+      {
+        name: "keywords",
+        content:
+          "NXM Nails, custom nail artistry, nail salon, acrylic nails, gel nails, chrome nails, nail artist, custom nail art",
+      },
       { property: "og:title", content: "NXM Nails — Custom Nail Artistry by Mia" },
-      { property: "og:description", content: "Custom nail artistry designed for those who love bold beauty and flawless detail." },
+      {
+        property: "og:description",
+        content:
+          "Custom nail artistry designed for those who love bold beauty and flawless detail.",
+      },
       { property: "og:type", content: "website" },
       { property: "og:url", content: "/" },
       { name: "twitter:title", content: "NXM Nails — Custom Nail Artistry by Mia" },
-      { name: "twitter:description", content: "Custom nail artistry for bold beauty and flawless detail." },
+      {
+        name: "twitter:description",
+        content: "Custom nail artistry for bold beauty and flawless detail.",
+      },
     ],
     links: [{ rel: "canonical", href: "/" }],
     scripts: [
@@ -123,7 +142,12 @@ export const Route = createFileRoute("/")({
           description: "Luxury nail studio specializing in custom nail artistry.",
           priceRange: "$$$",
           telephone: "+1-505-236-8383",
-          address: { "@type": "PostalAddress", addressLocality: "New York", addressRegion: "NY", addressCountry: "US" },
+          address: {
+            "@type": "PostalAddress",
+            addressLocality: "New York",
+            addressRegion: "NY",
+            addressCountry: "US",
+          },
           openingHours: ["Tu-Fr 10:00-19:00", "Sa 10:00-18:00"],
           sameAs: ["https://www.instagram.com/nxm_.nails/"],
         }),
@@ -134,14 +158,28 @@ export const Route = createFileRoute("/")({
   component: Home,
 });
 
-const FILTERS = ["All", "Gel", "Acrylic", "Nail Art", "French", "Seasonal", "Chrome", "Matte"] as const;
+const FILTERS = [
+  "All",
+  "Gel",
+  "Acrylic",
+  "Nail Art",
+  "French",
+  "Seasonal",
+  "Chrome",
+  "Matte",
+] as const;
 
 type Filter = (typeof FILTERS)[number];
 
 const GALLERY: { src: string; tag: Exclude<Filter, "All">; alt: string; span?: string }[] = [
   { src: g1, tag: "Acrylic", alt: "Long glossy black almond acrylic nails", span: "row-span-2" },
   { src: g2, tag: "Chrome", alt: "Bronze chrome mirror nails" },
-  { src: g4, tag: "Nail Art", alt: "Matte black nails with hand painted gold foil art", span: "row-span-2" },
+  {
+    src: g4,
+    tag: "Nail Art",
+    alt: "Matte black nails with hand painted gold foil art",
+    span: "row-span-2",
+  },
   { src: g3, tag: "French", alt: "Reverse French tip nails in black and cream" },
   { src: g6, tag: "Matte", alt: "Matte espresso brown almond nails" },
   { src: g5, tag: "Acrylic", alt: "Long stiletto oxblood acrylic nails", span: "row-span-2" },
@@ -150,27 +188,80 @@ const GALLERY: { src: string; tag: Exclude<Filter, "All">; alt: string; span?: s
 ];
 
 const SERVICES = [
-  { name: "Full Sets", desc: "Custom-sculpted tips shaped to your hand. Any length, any finish.", price: "$85", featured: true },
+  {
+    name: "Full Sets",
+    desc: "Custom-sculpted tips shaped to your hand. Any length, any finish.",
+    price: "$85",
+    featured: true,
+  },
   { name: "Fills", desc: "Regrowth reshaped and refined. Keep your set flawless.", price: "$55" },
-  { name: "Nail Art", desc: "Hand-painted detail, foils, chrome, freehand — priced per nail.", price: "$8" },
-  { name: "Gel Manicure", desc: "Cuticle care, shape, and long-wear gel color on natural nails.", price: "$45" },
-  { name: "Acrylic", desc: "Signature durability and definition. Sculpted to editorial standards.", price: "$75" },
-  { name: "Removal", desc: "Gentle soak-off with full nail-health restoration protocol.", price: "$25" },
-  { name: "Repair", desc: "Per-nail repair for chips, breaks, and lifts. Restored in minutes.", price: "$10" },
+  {
+    name: "Nail Art",
+    desc: "Hand-painted detail, foils, chrome, freehand — priced per nail.",
+    price: "$8",
+  },
+  {
+    name: "Gel Manicure",
+    desc: "Cuticle care, shape, and long-wear gel color on natural nails.",
+    price: "$45",
+  },
+  {
+    name: "Acrylic",
+    desc: "Signature durability and definition. Sculpted to editorial standards.",
+    price: "$75",
+  },
+  {
+    name: "Removal",
+    desc: "Gentle soak-off with full nail-health restoration protocol.",
+    price: "$25",
+  },
+  {
+    name: "Repair",
+    desc: "Per-nail repair for chips, breaks, and lifts. Restored in minutes.",
+    price: "$10",
+  },
 ];
 
 const TESTIMONIALS = [
-  { name: "Amara J.", text: "The most detailed set I have ever had. It feels like couture on my hands.", role: "Client since 2022" },
-  { name: "Simone R.", text: "The studio is a mood. Every visit feels like a private appointment at a fashion house.", role: "Editor, Vogue Adjacent" },
-  { name: "Maya L.", text: "Chrome work is unmatched. People stop me on the street to ask who did them.", role: "Stylist" },
-  { name: "Kai N.", text: "Clean, calm, and precise. NXM sets the bar for what a nail studio should feel like.", role: "Photographer" },
+  {
+    name: "Amara J.",
+    text: "The most detailed set I have ever had. It feels like couture on my hands.",
+    role: "Client since 2022",
+  },
+  {
+    name: "Simone R.",
+    text: "The studio is a mood. Every visit feels like a private appointment at a fashion house.",
+    role: "Editor, Vogue Adjacent",
+  },
+  {
+    name: "Maya L.",
+    text: "Chrome work is unmatched. People stop me on the street to ask who did them.",
+    role: "Stylist",
+  },
+  {
+    name: "Kai N.",
+    text: "Clean, calm, and precise. NXM sets the bar for what a nail studio should feel like.",
+    role: "Photographer",
+  },
 ];
 
 const FAQ = [
-  { q: "How do I book?", a: "Tap Reserve now, choose your service, and pick an open time — you'll get a confirmation text." },
-  { q: "How long does a set take?", a: "Anywhere from about 45 minutes to 2.5 hours depending on the service, shape, length, and art. Each booking reserves the right amount of time." },
-  { q: "What should I bring?", a: "Just yourself — arrive with clean, product-free nails so your set lasts." },
-  { q: "Do you accept walk-ins?", a: "NXM is by appointment only, so every client gets full, unhurried attention." },
+  {
+    q: "How do I book?",
+    a: "Tap Reserve now, choose your service, and pick an open time — you'll get a confirmation text.",
+  },
+  {
+    q: "How long does a set take?",
+    a: "Anywhere from about 45 minutes to 2.5 hours depending on the service, shape, length, and art. Each booking reserves the right amount of time.",
+  },
+  {
+    q: "What should I bring?",
+    a: "Just yourself — arrive with clean, product-free nails so your set lasts.",
+  },
+  {
+    q: "Do you accept walk-ins?",
+    a: "NXM is by appointment only, so every client gets full, unhurried attention.",
+  },
 ];
 
 function Home() {
@@ -204,7 +295,12 @@ function Home() {
     fetch(`${ledgerBase}/api/site/manifest`, { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
       .then((m: SiteManifest | null) => {
-        if (m) setManifest({ hero: abs(m.hero), about: abs(m.about), gallery: (m.gallery ?? []).map((g) => abs(g)!).filter(Boolean) });
+        if (m)
+          setManifest({
+            hero: abs(m.hero),
+            about: abs(m.about),
+            gallery: (m.gallery ?? []).map((g) => abs(g)!).filter(Boolean),
+          });
       })
       .catch(() => {});
     fetch(`${ledgerBase}/api/site/reviews`, { cache: "no-store" })
@@ -234,8 +330,9 @@ function Home() {
       return services.map((s) => ({
         name: s.name,
         desc:
-          [s.durationMin ? `${s.durationMin} min` : "", s.priceNote || ""].filter(Boolean).join(" · ") ||
-          "Cuticle care and finish included.",
+          [s.durationMin ? `${s.durationMin} min` : "", s.priceNote || ""]
+            .filter(Boolean)
+            .join(" · ") || "Cuticle care and finish included.",
         price: `$${Math.round(s.priceCents / 100)}`,
         featured: (s.category || "").toLowerCase() === "signature" || /signature/i.test(s.name),
       }));
@@ -246,7 +343,12 @@ function Home() {
   const effectiveReviews = useMemo(
     () =>
       reviews && reviews.length
-        ? reviews.map((r) => ({ name: r.author, text: r.text, role: r.role ?? "", rating: r.rating }))
+        ? reviews.map((r) => ({
+            name: r.author,
+            text: r.text,
+            role: r.role ?? "",
+            rating: r.rating,
+          }))
         : TESTIMONIALS.map((t) => ({ ...t, rating: 5 })),
     [reviews],
   );
@@ -269,7 +371,10 @@ function Home() {
   }, [manifest]);
 
   const igStrip = useMemo(
-    () => (manifest?.gallery?.length ? manifest.gallery.map((g) => g.url) : [g2, g6, g7, g3, g4, g1, g8, g5]),
+    () =>
+      manifest?.gallery?.length
+        ? manifest.gallery.map((g) => g.url)
+        : [g2, g6, g7, g3, g4, g1, g8, g5],
     [manifest],
   );
 
@@ -288,7 +393,10 @@ function Home() {
       >
         <div className="mx-auto flex max-w-7xl items-center justify-between px-5 md:px-10">
           <a href="#top" className="flex items-baseline gap-2">
-            <span className="text-2xl tracking-[0.28em] text-cream" style={{ fontFamily: "var(--font-serif)" }}>
+            <span
+              className="text-2xl tracking-[0.28em] text-cream"
+              style={{ fontFamily: "var(--font-serif)" }}
+            >
               NXM
             </span>
             <span className="text-eyebrow hidden sm:inline">Nails by Mia</span>
@@ -378,13 +486,16 @@ function Home() {
             <h1 className="mt-6 text-display text-cream text-[clamp(2.6rem,8vw,5.75rem)]">
               Art From
               <br />
-              <em className="not-italic bg-clip-text text-transparent" style={{ backgroundImage: "var(--gradient-bronze)" }}>
+              <em
+                className="not-italic bg-clip-text text-transparent"
+                style={{ backgroundImage: "var(--gradient-bronze)" }}
+              >
                 The Heart.
               </em>
             </h1>
             <p className="mt-6 max-w-lg text-base leading-relaxed text-muted-foreground md:text-lg">
-              Custom nail artistry designed for those who love bold beauty, timeless
-              style, and flawless detail.
+              Custom nail artistry designed for those who love bold beauty, timeless style, and
+              flawless detail.
             </p>
             <div className="mt-10 flex flex-wrap gap-3">
               <button type="button" onClick={() => setBookingOpen(true)} className="btn-luxe">
@@ -409,7 +520,13 @@ function Home() {
       {/* MARQUEE / VALUE STRIP */}
       <section className="border-y border-border/60 bg-surface/40 py-6">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-x-10 gap-y-3 px-5 md:px-10">
-          {["Editorial detail", "Premium products", "Sanitized studio", "By appointment only", "Custom art"].map((t) => (
+          {[
+            "Editorial detail",
+            "Premium products",
+            "Sanitized studio",
+            "By appointment only",
+            "Custom art",
+          ].map((t) => (
             <span key={t} className="text-eyebrow text-muted-foreground">
               — {t}
             </span>
@@ -424,12 +541,12 @@ function Home() {
             <div>
               <p className="text-eyebrow">Featured Work</p>
               <h2 className="mt-4 text-display text-cream text-[clamp(2rem,5vw,3.5rem)]">
-                A private archive of<br className="hidden sm:block" /> quiet obsessions.
+                A private archive of
+                <br className="hidden sm:block" /> quiet obsessions.
               </h2>
             </div>
             <p className="max-w-md text-sm leading-relaxed text-muted-foreground">
-              Every set is documented under studio light. Filter the archive by
-              technique or finish.
+              Every set is documented under studio light. Filter the archive by technique or finish.
             </p>
           </div>
 
@@ -500,18 +617,19 @@ function Home() {
           <div className="flex flex-col justify-center">
             <p className="text-eyebrow">The Artist</p>
             <h2 className="mt-4 text-display text-cream text-[clamp(2rem,5vw,3.5rem)]">
-              Precision meets<br />
+              Precision meets
+              <br />
               <em className="not-italic text-bronze-soft">devotion.</em>
             </h2>
             <p className="mt-6 text-base leading-relaxed text-muted-foreground">
-              NXM is a private studio built around obsessive attention to detail and
-              a strict standard of quality. Every appointment is one-to-one, unhurried,
-              and calibrated to your hand — never a template, never a rush.
+              NXM is a private studio built around obsessive attention to detail and a strict
+              standard of quality. Every appointment is one-to-one, unhurried, and calibrated to
+              your hand — never a template, never a rush.
             </p>
             <p className="mt-4 text-base leading-relaxed text-muted-foreground">
-              We work with premium, low-tox systems and maintain a hospital-grade
-              sanitation protocol. What you get is craftsmanship you can feel,
-              a finish you can see, and a space that feels entirely yours for the hour.
+              We work with premium, low-tox systems and maintain a hospital-grade sanitation
+              protocol. What you get is craftsmanship you can feel, a finish you can see, and a
+              space that feels entirely yours for the hour.
             </p>
 
             <dl className="mt-10 grid grid-cols-2 gap-6 border-t border-border pt-8">
@@ -544,8 +662,8 @@ function Home() {
               </h2>
             </div>
             <p className="max-w-md text-sm leading-relaxed text-muted-foreground">
-              Starting prices. Final quote depends on length, shape, and art. All
-              services include cuticle care and finish.
+              Starting prices. Final quote depends on length, shape, and art. All services include
+              cuticle care and finish.
             </p>
           </div>
 
@@ -559,7 +677,12 @@ function Home() {
                     : "border-border bg-surface hover:border-bronze/40"
                 }`}
               >
-                <div className="absolute inset-x-0 -top-px h-px" style={{ background: "linear-gradient(90deg, transparent, var(--bronze), transparent)" }} />
+                <div
+                  className="absolute inset-x-0 -top-px h-px"
+                  style={{
+                    background: "linear-gradient(90deg, transparent, var(--bronze), transparent)",
+                  }}
+                />
                 <div>
                   <div className="flex items-start justify-between gap-4">
                     <h3 className="text-2xl text-cream" style={{ fontFamily: "var(--font-serif)" }}>
@@ -576,7 +699,10 @@ function Home() {
                 <div className="mt-8 flex items-end justify-between border-t border-border pt-6">
                   <div>
                     <p className="text-eyebrow">From</p>
-                    <p className="mt-1 text-2xl text-cream" style={{ fontFamily: "var(--font-serif)" }}>
+                    <p
+                      className="mt-1 text-2xl text-cream"
+                      style={{ fontFamily: "var(--font-serif)" }}
+                    >
                       {s.price}
                     </p>
                   </div>
@@ -620,7 +746,10 @@ function Home() {
                     <Star key={k} className="size-4 fill-current" />
                   ))}
                 </div>
-                <p className="mt-6 max-w-2xl text-xl leading-relaxed text-cream md:text-2xl" style={{ fontFamily: "var(--font-serif)" }}>
+                <p
+                  className="mt-6 max-w-2xl text-xl leading-relaxed text-cream md:text-2xl"
+                  style={{ fontFamily: "var(--font-serif)" }}
+                >
                   &ldquo;{t.text}&rdquo;
                 </p>
                 <footer className="mt-6">
@@ -716,7 +845,6 @@ function Home() {
               <Phone className="size-4" /> Call the studio
             </a>
           </div>
-
         </div>
       </section>
 
@@ -737,7 +865,10 @@ function Home() {
                     className="flex w-full items-center justify-between gap-6 py-6 text-left"
                     aria-expanded={open}
                   >
-                    <span className="text-lg text-cream md:text-xl" style={{ fontFamily: "var(--font-serif)" }}>
+                    <span
+                      className="text-lg text-cream md:text-xl"
+                      style={{ fontFamily: "var(--font-serif)" }}
+                    >
                       {item.q}
                     </span>
                     <ChevronDown
@@ -764,12 +895,15 @@ function Home() {
       <footer className="relative border-t border-border bg-background py-16">
         <div className="mx-auto grid max-w-7xl gap-10 px-5 md:grid-cols-4 md:px-10">
           <div className="md:col-span-2">
-            <p className="text-serif text-3xl tracking-[0.28em] text-cream" style={{ fontFamily: "var(--font-serif)" }}>
+            <p
+              className="text-serif text-3xl tracking-[0.28em] text-cream"
+              style={{ fontFamily: "var(--font-serif)" }}
+            >
               NXM
             </p>
             <p className="mt-4 max-w-sm text-sm leading-relaxed text-muted-foreground">
-              A private luxury nail studio. By appointment only. Custom artistry,
-              editorial finish, one client at a time.
+              A private luxury nail studio. By appointment only. Custom artistry, editorial finish,
+              one client at a time.
             </p>
             <div className="mt-6 flex gap-3">
               {[
@@ -796,8 +930,13 @@ function Home() {
           <div>
             <p className="text-eyebrow">Contact</p>
             <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
-              <li className="flex items-center gap-2"><Mail className="size-4 text-bronze-soft" /> hello@nxmnails.com</li>
-              <li className="flex items-center gap-2"><Phone className="size-4 text-bronze-soft" /> <a href="tel:+15052368383">505-236-8383</a></li>
+              <li className="flex items-center gap-2">
+                <Mail className="size-4 text-bronze-soft" /> hello@nxmnails.com
+              </li>
+              <li className="flex items-center gap-2">
+                <Phone className="size-4 text-bronze-soft" />{" "}
+                <a href="tel:+15052368383">505-236-8383</a>
+              </li>
             </ul>
           </div>
 
@@ -845,7 +984,10 @@ type BookService = {
 const money = (c: number) => `$${Math.round(c / 100)}`;
 const prettyTime = (t: string) => {
   const [h, m] = t.split(":").map(Number);
-  return new Date(2000, 0, 1, h, m).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  return new Date(2000, 0, 1, h, m).toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  });
 };
 
 const isoOfDate = (d: Date) =>
@@ -861,7 +1003,10 @@ function formatHours(hours: { weekday: number; open: string; close: string }[] |
   const order = [1, 2, 3, 4, 5, 6, 0]; // Mon → Sun
   const items = order.map((wd) => {
     const h = byDay.get(wd);
-    return { label: names[wd], val: h ? `${prettyTime(h.open)} – ${prettyTime(h.close)}` : "Closed" };
+    return {
+      label: names[wd],
+      val: h ? `${prettyTime(h.open)} – ${prettyTime(h.close)}` : "Closed",
+    };
   });
   const lines: string[] = [];
   let i = 0;
@@ -879,14 +1024,16 @@ function MiniCalendar({
   value,
   onChange,
   openWeekdays,
+  maxAdvanceDays = 90,
 }: {
   value: string;
   onChange: (d: string) => void;
   openWeekdays: number[] | null;
+  maxAdvanceDays?: number;
 }) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const maxTime = today.getTime() + 90 * 86400000;
+  const maxTime = today.getTime() + maxAdvanceDays * 86400000;
   const [cursor, setCursor] = useState(() => {
     const base = value ? new Date(`${value}T00:00:00`) : new Date();
     return new Date(base.getFullYear(), base.getMonth(), 1);
@@ -975,6 +1122,7 @@ function BookingModal({ base, onClose }: { base: string; onClose: () => void }) 
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [openDays, setOpenDays] = useState<number[] | null>(null);
+  const [maxAdvanceDays, setMaxAdvanceDays] = useState(90);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -986,7 +1134,10 @@ function BookingModal({ base, onClose }: { base: string; onClose: () => void }) 
       .catch(() => setServices([]));
     fetch(`${base}/api/book/days`)
       .then((r) => r.json())
-      .then((d: { weekdays: number[] }) => setOpenDays(d.weekdays ?? []))
+      .then((d: { weekdays: number[]; maxAdvanceDays?: number }) => {
+        setOpenDays(d.weekdays ?? []);
+        if (d.maxAdvanceDays) setMaxAdvanceDays(d.maxAdvanceDays);
+      })
       .catch(() => setOpenDays([]));
   }, [base]);
 
@@ -1045,7 +1196,11 @@ function BookingModal({ base, onClose }: { base: string; onClose: () => void }) 
       >
         <div className="flex items-center justify-between">
           <p className="text-eyebrow">Book with NXM</p>
-          <button onClick={onClose} className="text-muted-foreground hover:text-cream" aria-label="Close">
+          <button
+            onClick={onClose}
+            className="text-muted-foreground hover:text-cream"
+            aria-label="Close"
+          >
             <X className="size-5" />
           </button>
         </div>
@@ -1061,8 +1216,8 @@ function BookingModal({ base, onClose }: { base: string; onClose: () => void }) 
           <div className="py-10 text-center">
             <h3 className="text-display text-cream text-3xl">You're booked.</h3>
             <p className="mx-auto mt-4 max-w-sm text-sm text-muted-foreground">
-              {service?.name} on {date} at {prettyTime(time)}. We'll text {phone} to confirm. See you
-              soon, {name.split(" ")[0]}!
+              {service?.name} on {date} at {prettyTime(time)}. We'll text {phone} to confirm. See
+              you soon, {name.split(" ")[0]}!
             </p>
             <button className="btn-luxe mt-8" onClick={onClose}>
               Done
@@ -1071,7 +1226,11 @@ function BookingModal({ base, onClose }: { base: string; onClose: () => void }) 
         ) : (
           <>
             <h3 className="mt-2 text-display text-cream text-3xl">
-              {step === "service" ? "Choose a service" : step === "time" ? "Pick a time" : "Your details"}
+              {step === "service"
+                ? "Choose a service"
+                : step === "time"
+                  ? "Pick a time"
+                  : "Your details"}
             </h3>
 
             {step === "service" && (
@@ -1100,7 +1259,9 @@ function BookingModal({ base, onClose }: { base: string; onClose: () => void }) 
                                   {s.durationMin} min{s.priceNote ? ` · ${s.priceNote}` : ""}
                                 </p>
                               </div>
-                              <span className="shrink-0 text-bronze-soft">{money(s.priceCents)}</span>
+                              <span className="shrink-0 text-bronze-soft">
+                                {money(s.priceCents)}
+                              </span>
                             </button>
                           ))}
                       </div>
@@ -1116,7 +1277,12 @@ function BookingModal({ base, onClose }: { base: string; onClose: () => void }) 
                   {service.name} · {service.durationMin} min · {money(service.priceCents)}
                 </p>
                 <label className="mt-4 block text-eyebrow">Date</label>
-                <MiniCalendar value={date} onChange={setDate} openWeekdays={openDays} />
+                <MiniCalendar
+                  value={date}
+                  onChange={setDate}
+                  openWeekdays={openDays}
+                  maxAdvanceDays={maxAdvanceDays}
+                />
                 {date && (
                   <>
                     <label className="mt-5 block text-eyebrow">Open times</label>
