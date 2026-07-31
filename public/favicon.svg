@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="bronze" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#D2A878"/>
+      <stop offset="0.55" stop-color="#9C7A55"/>
+      <stop offset="1" stop-color="#6E5238"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="240" height="240" rx="56" fill="#0B0B0B"/>
+  <rect x="13" y="13" width="230" height="230" rx="51" fill="none" stroke="url(#bronze)" stroke-width="9"/>
+  <text x="128" y="150" text-anchor="middle"
+        font-family="'Cormorant Garamond','Palatino Linotype',Palatino,Georgia,'Times New Roman',serif"
+        font-size="168" font-weight="500" fill="#F3ECE0">N</text>
+</svg>

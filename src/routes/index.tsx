@@ -310,9 +310,13 @@ function Home() {
               </a>
             ))}
           </nav>
-          <a href="#booking" className="hidden md:inline-flex btn-luxe !py-3 !px-6 !min-h-0 text-[0.7rem]">
+          <button
+            type="button"
+            onClick={() => setBookingOpen(true)}
+            className="hidden md:inline-flex btn-luxe !py-3 !px-6 !min-h-0 text-[0.7rem]"
+          >
             Book
-          </a>
+          </button>
           <button
             aria-label={menuOpen ? "Close menu" : "Open menu"}
             onClick={() => setMenuOpen((v) => !v)}
@@ -330,7 +334,6 @@ function Home() {
                 ["Services", "#services"],
                 ["Journal", "#instagram"],
                 ["FAQ", "#faq"],
-                ["Book", "#booking"],
               ].map(([label, href]) => (
                 <a
                   key={href}
@@ -341,6 +344,16 @@ function Home() {
                   {label}
                 </a>
               ))}
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false);
+                  setBookingOpen(true);
+                }}
+                className="mt-2 btn-luxe !min-h-0 justify-center py-3 text-[0.7rem]"
+              >
+                Book
+              </button>
             </div>
           </div>
         )}
@@ -374,9 +387,9 @@ function Home() {
               style, and flawless detail.
             </p>
             <div className="mt-10 flex flex-wrap gap-3">
-              <a href="#booking" className="btn-luxe">
+              <button type="button" onClick={() => setBookingOpen(true)} className="btn-luxe">
                 <Calendar className="size-4" /> Book appointment
-              </a>
+              </button>
               <a href="#work" className="btn-ghost">
                 View portfolio <ArrowUpRight className="size-4" />
               </a>
@@ -567,12 +580,13 @@ function Home() {
                       {s.price}
                     </p>
                   </div>
-                  <a
-                    href="#booking"
+                  <button
+                    type="button"
+                    onClick={() => setBookingOpen(true)}
                     className="inline-flex items-center gap-2 text-[0.72rem] uppercase tracking-[0.24em] text-bronze-soft transition-transform group-hover:translate-x-1"
                   >
                     Book <ArrowUpRight className="size-4" />
-                  </a>
+                  </button>
                 </div>
               </article>
             ))}
