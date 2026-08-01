@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
   Calendar,
+  Check,
   Instagram,
   Facebook,
   Phone,
@@ -1146,7 +1147,7 @@ function MiniCalendar({
 function BookingModal({ base, onClose }: { base: string; onClose: () => void }) {
   const [step, setStep] = useState<"service" | "time" | "details" | "done">("service");
   const [services, setServices] = useState<BookService[] | null>(null);
-  const [service, setService] = useState<BookService | null>(null);
+  const [selected, setSelected] = useState<BookService[]>([]);
   const [date, setDate] = useState("");
   const [times, setTimes] = useState<string[] | null>(null);
   const [time, setTime] = useState("");
@@ -1160,11 +1161,21 @@ function BookingModal({ base, onClose }: { base: string; onClose: () => void }) 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
+  // One or more services (e.g. soak off + a new set) booked as a single block.
+  const serviceKey = selected.map((s) => s.id).join(",");
+  const totalDuration = selected.reduce((n, s) => n + s.durationMin, 0);
+  const totalPrice = selected.reduce((n, s) => n + bookPrice(s), 0);
+  const comboName = selected.map((s) => s.name).join(" + ");
+  const anySqueeze = selected.some((s) => !!s.squeezeIn || /squeeze/i.test(s.name));
+  const toggleService = (s: BookService) =>
+    setSelected((prev) =>
+      prev.some((x) => x.id === s.id) ? prev.filter((x) => x.id !== s.id) : [...prev, s],
+    );
+
   // Squeeze-ins hinge on the (few) after-last-client times, so never thin them.
-  const isSqueeze = !!service && (!!service.squeezeIn || /squeeze/i.test(service.name));
   const shownTimes = useMemo(
-    () => (times ? (showAllTimes || isSqueeze ? times : thinTimes(times)) : []),
-    [times, showAllTimes, isSqueeze],
+    () => (times ? (showAllTimes || anySqueeze ? times : thinTimes(times)) : []),
+    [times, showAllTimes, anySqueeze],
   );
   const hasMoreTimes = !!times && shownTimes.length < times.length;
 
@@ -1183,29 +1194,29 @@ function BookingModal({ base, onClose }: { base: string; onClose: () => void }) 
       .catch(() => setOpenDays([]));
   }, [base]);
 
-  // Which dates have any open slot for the chosen service — to gray out full days.
+  // Which dates have any open slot for the chosen service(s) — to gray out full days.
   useEffect(() => {
-    if (!service || !base) return;
+    if (!serviceKey || !base) return;
     setOpenDates(null);
-    fetch(`${base}/api/book/open-dates?serviceId=${service.id}`)
+    fetch(`${base}/api/book/open-dates?serviceIds=${serviceKey}`)
       .then((r) => r.json())
       .then((d: { dates: string[] }) => setOpenDates(new Set(d.dates ?? [])))
       .catch(() => setOpenDates(null));
-  }, [service, base]);
+  }, [serviceKey, base]);
 
   useEffect(() => {
-    if (!service || !date || !base) return;
+    if (!serviceKey || !date || !base) return;
     setTimes(null);
     setTime("");
     setShowAllTimes(false);
-    fetch(`${base}/api/book/availability?date=${date}&serviceId=${service.id}`)
+    fetch(`${base}/api/book/availability?date=${date}&serviceIds=${serviceKey}`)
       .then((r) => r.json())
       .then((d: { times: string[] }) => setTimes(d.times ?? []))
       .catch(() => setTimes([]));
-  }, [service, date, base]);
+  }, [serviceKey, date, base]);
 
   async function submit() {
-    if (!service || !name.trim() || !phone.trim()) {
+    if (selected.length === 0 || !name.trim() || !phone.trim()) {
       setError("Please add your name and phone.");
       return;
     }
@@ -1216,7 +1227,7 @@ function BookingModal({ base, onClose }: { base: string; onClose: () => void }) 
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          serviceId: service.id,
+          serviceIds: selected.map((s) => s.id),
           date,
           time,
           clientName: name.trim(),
@@ -1269,8 +1280,8 @@ function BookingModal({ base, onClose }: { base: string; onClose: () => void }) 
           <div className="py-10 text-center">
             <h3 className="text-display text-cream text-3xl">You're booked.</h3>
             <p className="mx-auto mt-4 max-w-sm text-sm text-muted-foreground">
-              {service?.name} on {date} at {prettyTime(time)}. We'll text {phone} to confirm. See
-              you soon, {name.split(" ")[0]}!
+              {comboName} on {date} at {prettyTime(time)}. We'll text {phone} to confirm. See you
+              soon, {name.split(" ")[0]}!
             </p>
             <button className="btn-luxe mt-8" onClick={onClose}>
               Done
@@ -1280,58 +1291,93 @@ function BookingModal({ base, onClose }: { base: string; onClose: () => void }) 
           <>
             <h3 className="mt-2 text-display text-cream text-3xl">
               {step === "service"
-                ? "Choose a service"
+                ? "Choose services"
                 : step === "time"
                   ? "Pick a time"
                   : "Your details"}
             </h3>
 
             {step === "service" && (
-              <div className="mt-5 flex flex-col gap-5">
-                {services === null ? (
-                  <p className="text-sm text-muted-foreground">Loading services…</p>
-                ) : (
-                  groups.map((cat) => (
-                    <div key={cat}>
-                      <p className="text-eyebrow mb-2">{cat}</p>
-                      <div className="flex flex-col gap-2">
-                        {services
-                          .filter((s) => (s.category || "Services") === cat)
-                          .map((s) => (
-                            <button
-                              key={s.id}
-                              onClick={() => {
-                                setService(s);
-                                setStep("time");
-                              }}
-                              className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface/60 p-4 text-left transition-colors hover:border-bronze/50"
-                            >
-                              <div className="min-w-0">
-                                <p className="truncate text-cream">{s.name}</p>
-                                <p className="truncate text-xs text-muted-foreground">
-                                  {s.durationMin} min
-                                  {s.squeezeIn ? " · squeeze-in +$10" : ""}
-                                  {s.priceNote ? ` · ${s.priceNote}` : ""}
-                                </p>
-                              </div>
-                              <span className="shrink-0 text-bronze-soft">
-                                {money(bookPrice(s))}
-                              </span>
-                            </button>
-                          ))}
+              <>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Pick one or more — e.g. a soak off plus a new set.
+                </p>
+                <div className="mt-4 flex flex-col gap-5">
+                  {services === null ? (
+                    <p className="text-sm text-muted-foreground">Loading services…</p>
+                  ) : (
+                    groups.map((cat) => (
+                      <div key={cat}>
+                        <p className="text-eyebrow mb-2">{cat}</p>
+                        <div className="flex flex-col gap-2">
+                          {services
+                            .filter((s) => (s.category || "Services") === cat)
+                            .map((s) => {
+                              const on = selected.some((x) => x.id === s.id);
+                              return (
+                                <button
+                                  key={s.id}
+                                  onClick={() => toggleService(s)}
+                                  className={`flex items-center justify-between gap-3 rounded-xl border p-4 text-left transition-colors ${
+                                    on
+                                      ? "border-bronze bg-bronze/10"
+                                      : "border-border bg-surface/60 hover:border-bronze/50"
+                                  }`}
+                                >
+                                  <div className="flex min-w-0 items-center gap-3">
+                                    <span
+                                      className={`grid size-5 shrink-0 place-items-center rounded-md border ${
+                                        on
+                                          ? "border-bronze bg-bronze text-background"
+                                          : "border-border"
+                                      }`}
+                                    >
+                                      {on && <Check className="size-3.5" />}
+                                    </span>
+                                    <div className="min-w-0">
+                                      <p className="truncate text-cream">{s.name}</p>
+                                      <p className="truncate text-xs text-muted-foreground">
+                                        {s.durationMin} min
+                                        {s.squeezeIn ? " · squeeze-in +$10" : ""}
+                                        {s.priceNote ? ` · ${s.priceNote}` : ""}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <span className="shrink-0 text-bronze-soft">
+                                    {money(bookPrice(s))}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                        </div>
                       </div>
-                    </div>
-                  ))
+                    ))
+                  )}
+                </div>
+
+                {selected.length > 0 && (
+                  <div className="mt-5 flex items-center justify-between gap-3 border-t border-border pt-4">
+                    <p className="min-w-0 text-sm text-muted-foreground">
+                      {selected.length} service{selected.length > 1 ? "s" : ""} · {totalDuration}{" "}
+                      min · <span className="text-cream">{money(totalPrice)}</span>
+                    </p>
+                    <button
+                      className="btn-luxe !min-h-0 shrink-0 !px-6 !py-3 text-[0.7rem]"
+                      onClick={() => setStep("time")}
+                    >
+                      Continue
+                    </button>
+                  </div>
                 )}
-              </div>
+              </>
             )}
 
-            {step === "time" && service && (
+            {step === "time" && selected.length > 0 && (
               <div className="mt-5">
                 <p className="text-sm text-muted-foreground">
-                  {service.name} · {service.durationMin} min · {money(bookPrice(service))}
+                  {comboName} · {totalDuration} min · {money(totalPrice)}
                 </p>
-                {service.squeezeIn ? (
+                {anySqueeze ? (
                   <p className="mt-1 text-xs text-bronze-soft">
                     Squeeze-in — fit in after the last appointment. $10 extra.
                   </p>
@@ -1388,11 +1434,11 @@ function BookingModal({ base, onClose }: { base: string; onClose: () => void }) 
               </div>
             )}
 
-            {step === "details" && service && (
+            {step === "details" && selected.length > 0 && (
               <div className="mt-5 flex flex-col gap-3">
                 <p className="text-sm text-muted-foreground">
-                  {service.name} · {date} · {prettyTime(time)} · {money(bookPrice(service))}
-                  {service.squeezeIn ? " (incl. $10 squeeze-in)" : ""}
+                  {comboName} · {date} · {prettyTime(time)} · {money(totalPrice)}
+                  {anySqueeze ? " (incl. $10 squeeze-in)" : ""}
                 </p>
                 <label className="text-eyebrow">Your name</label>
                 <input
