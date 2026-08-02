@@ -6,7 +6,6 @@ import {
   Instagram,
   Facebook,
   Phone,
-  Mail,
   Clock,
   Star,
   ArrowUpRight,
@@ -915,7 +914,6 @@ function Home() {
               {[
                 [Instagram, "https://www.instagram.com/nxm_.nails/", "Instagram"],
                 [Facebook, "https://facebook.com", "Facebook"],
-                [Mail, "mailto:hello@nxmnails.com", "Email"],
                 [Phone, "tel:+15052368383", "Phone"],
               ].map(([Icon, href, label]) => {
                 const I = Icon as typeof Instagram;
@@ -937,11 +935,14 @@ function Home() {
             <p className="text-eyebrow">Contact</p>
             <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
               <li className="flex items-center gap-2">
-                <Mail className="size-4 text-bronze-soft" /> hello@nxmnails.com
-              </li>
-              <li className="flex items-center gap-2">
                 <Phone className="size-4 text-bronze-soft" />{" "}
                 <a href="tel:+15052368383">505-236-8383</a>
+              </li>
+              <li className="flex items-center gap-2">
+                <Instagram className="size-4 text-bronze-soft" />{" "}
+                <a href="https://www.instagram.com/nxm_.nails/" target="_blank" rel="noreferrer">
+                  @nxm_.nails
+                </a>
               </li>
             </ul>
           </div>
