@@ -279,6 +279,17 @@ function Home() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  // Remember where a visitor came from (e.g. ?ref=tiktok) so it tags their booking.
+  useEffect(() => {
+    try {
+      const p = new URLSearchParams(window.location.search);
+      const ref = p.get("ref") || p.get("src");
+      if (ref) localStorage.setItem("nxm_ref", ref);
+    } catch {
+      /* private mode / no storage — ignore */
+    }
+  }, []);
+
   const loaderData = Route.useLoaderData();
   const ledgerBase = loaderData.ledgerBase;
   const [manifest, setManifest] = useState<SiteManifest | null>(loaderData.manifest);
@@ -1223,6 +1234,12 @@ function BookingModal({ base, onClose }: { base: string; onClose: () => void }) 
     }
     setBusy(true);
     setError("");
+    let source: string | undefined;
+    try {
+      source = localStorage.getItem("nxm_ref") || undefined;
+    } catch {
+      /* ignore */
+    }
     try {
       const res = await fetch(`${base}/api/book/create`, {
         method: "POST",
@@ -1234,6 +1251,7 @@ function BookingModal({ base, onClose }: { base: string; onClose: () => void }) 
           clientName: name.trim(),
           clientPhone: phone.trim(),
           clientEmail: email.trim() || undefined,
+          source,
         }),
       });
       const data = await res.json();
